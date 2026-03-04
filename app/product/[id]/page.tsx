@@ -20,6 +20,11 @@ export default function ProductDetailPage() {
     const [showCheckout, setShowCheckout] = useState(false);
     const [showChat, setShowChat] = useState(false);
 
+    // --- Internal Dispatch states ---
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'ai'; text: string }>>([]);
+    const [isAwaitingNetwork, setIsAwaitingNetwork] = useState(false);
+
     const addToCart = useCartStore((state) => state.addToCart);
 
     if (!product) {
@@ -41,6 +46,23 @@ export default function ProductDetailPage() {
         );
     }
 
+    const handleNegotiateClick = async () => {
+        setIsAwaitingNetwork(true);
+        try {
+            const res = await fetch('/api/start-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productId: product.id }),
+            });
+            if (!res.ok) throw new Error('Failed to start session');
+            const data = await res.json();
+            setSessionId(data.session_id);
+            setShowChat(true);
+        } finally {
+            setIsAwaitingNetwork(false);
+        }
+    };
+
     const handleDealAccepted = (price: number) => {
         setNegotiatedPrice(price);
     };
@@ -54,6 +76,8 @@ export default function ProductDetailPage() {
                 negotiatedPrice,
                 originalPrice: product.displayed_price,
                 savings,
+                quantity: 1,
+                imageUrl: product.high_res_image_url,
             });
             setShowCheckout(true);
         }
@@ -162,14 +186,27 @@ export default function ProductDetailPage() {
                             ) : (
                                 <>
                                     <button
-                                        onClick={() => setShowChat(true)}
+                                        onClick={handleNegotiateClick}
+                                        disabled={isAwaitingNetwork}
                                         className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] flex items-center justify-center gap-2 animate-pulse"
                                     >
                                         <Sparkles className="w-6 h-6" />
-                                        Negotiate a Better Price
+                                        {isAwaitingNetwork ? 'Starting session…' : 'Negotiate a Better Price'}
                                     </button>
 
                                     <button
+                                        onClick={() => {
+                                            addToCart({
+                                                productId: product.id,
+                                                productName: product.title,
+                                                negotiatedPrice: product.displayed_price,
+                                                originalPrice: product.displayed_price,
+                                                savings: 0,
+                                                quantity: 1,
+                                                imageUrl: product.high_res_image_url,
+                                            });
+                                            router.push('/cart');
+                                        }}
                                         className="w-full py-4 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
                                     >
                                         <ShoppingCart className="w-5 h-5" />
@@ -222,6 +259,11 @@ export default function ProductDetailPage() {
                     productName={product.title}
                     displayedPrice={product.displayed_price}
                     onDealAccepted={handleDealAccepted}
+                    sessionId={sessionId}
+                    chatHistory={chatHistory}
+                    setChatHistory={setChatHistory}
+                    isAwaitingNetwork={isAwaitingNetwork}
+                    setIsAwaitingNetwork={setIsAwaitingNetwork}
                 />
             )}
 

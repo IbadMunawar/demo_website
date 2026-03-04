@@ -6,6 +6,7 @@ export interface Product {
   high_res_image_url: string;
   displayed_price: number;
   mam: number; // Minimum Acceptable Margin (Secret - not exposed to frontend)
+  category: string; // Product category for filtering
 }
 
 // Mock database of products
@@ -17,6 +18,7 @@ export const products: Product[] = [
     high_res_image_url: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&q=80',
     displayed_price: 899,
     mam: 650, // Secret: Minimum acceptable price
+    category: 'Phones',
   },
   {
     id: 'laptop-001',
@@ -25,6 +27,7 @@ export const products: Product[] = [
     high_res_image_url: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80',
     displayed_price: 1299,
     mam: 950, // Secret: Minimum acceptable price
+    category: 'Laptops',
   },
   {
     id: 'headphones-001',
@@ -33,6 +36,7 @@ export const products: Product[] = [
     high_res_image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
     displayed_price: 349,
     mam: 220, // Secret: Minimum acceptable price
+    category: 'Audio',
   },
   {
     id: 'smartwatch-001',
@@ -41,6 +45,7 @@ export const products: Product[] = [
     high_res_image_url: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=800&q=80',
     displayed_price: 279,
     mam: 180, // Secret: Minimum acceptable price
+    category: 'Wearables',
   },
 ];
 
@@ -52,4 +57,10 @@ export function getProductById(id: string): Product | undefined {
 // Helper function to get all products
 export function getAllProducts(): Product[] {
   return products;
+}
+
+// Helper function to get unique categories
+export function getUniqueCategories(): string[] {
+  const categories = products.map((product) => product.category);
+  return Array.from(new Set(categories)).sort();
 }

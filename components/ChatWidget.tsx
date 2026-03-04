@@ -4,33 +4,39 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-interface Message {
-    id: string;
+// Shared message shape — owned by the parent page
+export interface ChatMessage {
+    role: 'user' | 'ai';
     text: string;
-    sender: 'user' | 'bot';
-    timestamp: Date;
 }
 
 interface ChatWidgetProps {
     productId: string;
     productName: string;
     displayedPrice: number;
-    onDealAccepted?: (negotiatedPrice: number) => void;
+    // Lifted state — owned by parent
+    sessionId: string | null;
+    chatHistory: ChatMessage[];
+    setChatHistory: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+    isAwaitingNetwork: boolean;
+    setIsAwaitingNetwork: React.Dispatch<React.SetStateAction<boolean>>;
+    onDealAccepted: (price: number) => void;
 }
 
 export default function ChatWidget({
     productId,
     productName,
     displayedPrice,
+    sessionId,
+    chatHistory,
+    setChatHistory,
+    isAwaitingNetwork,
+    setIsAwaitingNetwork,
     onDealAccepted,
 }: ChatWidgetProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isNegotiating, setIsNegotiating] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
-    const [sessionId, setSessionId] = useState<string | null>(null);
-    const [currentOffer, setCurrentOffer] = useState<number>(displayedPrice);
     const [dealAccepted, setDealAccepted] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -43,194 +49,90 @@ export default function ChatWidget({
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, isTyping]);
+    }, [chatHistory, isAwaitingNetwork]);
 
     // Initialize negotiation session
-    const startNegotiation = async () => {
+    // Session is always pre-provided by the parent via /api/start-session.
+    // This function fires when the widget opens and posts a welcome message.
+    const startNegotiation = () => {
         setIsNegotiating(true);
-
-        // Add system message
-        addMessage('Connecting you to a negotiation agent...', 'bot');
-
-        try {
-            const response = await fetch('/api/tenant/start-negotiation', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ productId }),
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                addMessage(
-                    error.message || 'Failed to start negotiation. Please check your configuration.',
-                    'bot'
-                );
-                return;
-            }
-
-            const data = await response.json();
-            setSessionId(data.session_id);
-
-            // Welcome message
+        if (sessionId) {
             setTimeout(() => {
-                addMessage(
-                    `Hello! I'm here to help you get the best price on ${productName}. The listed price is $${displayedPrice}. What price are you hoping for?`,
-                    'bot'
-                );
+                setChatHistory((prev) => [
+                    ...prev,
+                    {
+                        role: 'ai',
+                        text: `Hello! I'm here to help you get the best price on ${productName}. The listed price is $${displayedPrice}. What price are you hoping for?`,
+                    },
+                ]);
             }, 800);
-        } catch (error) {
-            console.error('Error starting negotiation:', error);
-            addMessage('Connection error. Please try again later.', 'bot');
         }
     };
 
-    // Add message to chat
-    const addMessage = (text: string, sender: 'user' | 'bot') => {
-        const newMessage: Message = {
-            id: Date.now().toString() + Math.random(),
-            text,
-            sender,
-            timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, newMessage]);
-    };
+    // --- External Dispatch: onSubmit handler ---
+    const onSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const userText = inputText.trim();
+        if (!userText || !sessionId || isAwaitingNetwork || dealAccepted) return;
 
-    // Send message to orchestrator
-    const sendMessage = async () => {
-        if (!inputText.trim() || !sessionId) return;
-
-        const userMessage = inputText.trim();
+        // Optimistic UI — append user message instantly and clear input
+        setChatHistory((prev) => [...prev, { role: 'user', text: userText }]);
         setInputText('');
 
-        // Add user message immediately (Optimistic UI)
-        addMessage(userMessage, 'user');
-
-        // Show typing indicator
-        setIsTyping(true);
-
+        setIsAwaitingNetwork(true);
         try {
-            // Simulate API call (replace with actual orchestrator endpoint)
-            // For demo purposes, simulate a negotiation flow
-            setTimeout(() => {
-                setIsTyping(false);
-                handleNegotiationResponse(userMessage);
-            }, 1500);
-
-            /*
-            // REPLACE THIS COMMENTED CODE WITH YOUR ACTUAL ORCHESTRATOR CALL:
-            const response = await fetch(`${orchestratorUrl}/message`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                session_id: sessionId,
-                message: userMessage,
-              }),
-            });
-      
-            if (!response.ok) {
-              throw new Error('Failed to send message');
-            }
-      
-            const data = await response.json();
-            setIsTyping(false);
-            
-            addMessage(data.response, 'bot');
-            
-            // Check for deal acceptance
-            if (data.negotiation_status === 'deal_accepted') {
-              handleDealAccepted(data.negotiated_price);
-            } else if (data.current_offer) {
-              setCurrentOffer(data.current_offer);
-            }
-            */
-        } catch (error) {
-            console.error('Error sending message:', error);
-            setIsTyping(false);
-            addMessage('Sorry, I encountered an error. Please try again.', 'bot');
-        }
-    };
-
-    // Simulate negotiation response (DEMO ONLY - Remove when integrating with real orchestrator)
-    const handleNegotiationResponse = (userMessage: string) => {
-        const lowerMessage = userMessage.toLowerCase();
-
-        // Extract numbers from user message
-        const numbers = userMessage.match(/\d+/g);
-        const userOffer = numbers ? parseInt(numbers[0]) : null;
-
-        if (userOffer !== null) {
-            // Simulate negotiation logic
-            if (userOffer >= displayedPrice * 0.75) {
-                // Accept the deal
-                handleDealAccepted(userOffer);
-            } else if (userOffer >= displayedPrice * 0.6) {
-                // Counter offer
-                const counter = Math.round(displayedPrice * 0.78);
-                setCurrentOffer(counter);
-                addMessage(
-                    `I appreciate your interest! While $${userOffer} is below what we can offer, I can do $${counter}. That's a great deal! What do you think?`,
-                    'bot'
-                );
-            } else {
-                addMessage(
-                    `I understand you're looking for a good deal. The absolute best I can do is $${Math.round(displayedPrice * 0.75)}. This is already a significant discount!`,
-                    'bot'
-                );
-            }
-        } else {
-            addMessage(
-                `I'd love to help you get a great price! The current asking price is $${displayedPrice}. What price did you have in mind?`,
-                'bot'
+            const res = await fetch(
+                process.env.NEXT_PUBLIC_INA_ORCHESTRATOR_CHAT_URL as string,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId, user_text: userText }),
+                }
             );
+
+            if (!res.ok) throw new Error(`Orchestrator error: ${res.status}`);
+
+            const response = await res.json();
+
+            // Append AI reply to shared history
+            setChatHistory((prev) => [
+                ...prev,
+                { role: 'ai', text: response.response_text },
+            ]);
+
+            // --- Success Protocol ---
+            if (response.negotiation_status === 'deal_accepted') {
+                setDealAccepted(true); // disables input
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#6366f1', '#ec4899', '#f59e0b'],
+                });
+                onDealAccepted(response.final_price);
+            }
+        } catch (err) {
+            console.error('Orchestrator fetch failed:', err);
+            setChatHistory((prev) => [
+                ...prev,
+                { role: 'ai', text: 'Sorry, I encountered an error. Please try again.' },
+            ]);
+        } finally {
+            setIsAwaitingNetwork(false);
         }
     };
 
-    // Handle successful deal
-    const handleDealAccepted = (negotiatedPrice: number) => {
-        setDealAccepted(true);
-        setCurrentOffer(negotiatedPrice);
 
-        // Trigger confetti animation
-        confetti({
-            particleCount: 100,
-            spread: 70,
-            origin: { y: 0.6 },
-            colors: ['#6366f1', '#ec4899', '#f59e0b'],
-        });
 
-        // Add success message
-        addMessage(
-            `🎉 Congratulations! I can offer you ${productName} for $${negotiatedPrice}! You're saving $${displayedPrice - negotiatedPrice}! Click "Claim Offer" below to proceed to checkout.`,
-            'bot'
-        );
-
-        // Notify parent component
-        if (onDealAccepted) {
-            onDealAccepted(negotiatedPrice);
-        }
-    };
-
-    // Handle open  widget
+    // Handle open widget
     const handleOpen = () => {
         setIsOpen(true);
         if (!isNegotiating) {
             startNegotiation();
         }
-        // Focus input after a short delay
         setTimeout(() => {
             inputRef.current?.focus();
         }, 300);
-    };
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
     };
 
     return (
@@ -272,18 +174,18 @@ export default function ChatWidget({
 
                     {/* Messages Container */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {messages.map((message) => (
+                        {chatHistory.map((message, idx) => (
                             <div
-                                key={message.id}
-                                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                                key={idx}
+                                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
-                                {message.sender === 'bot' && (
+                                {message.role === 'ai' && (
                                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold mr-2 flex-shrink-0">
                                         AI
                                     </div>
                                 )}
                                 <div
-                                    className={`max-w-[75%] px-4 py-2 rounded-2xl ${message.sender === 'user'
+                                    className={`max-w-[75%] px-4 py-2 rounded-2xl ${message.role === 'user'
                                         ? 'bg-indigo-600 text-white rounded-br-none'
                                         : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-none'
                                         }`}
@@ -293,8 +195,8 @@ export default function ChatWidget({
                             </div>
                         ))}
 
-                        {/* Typing Indicator */}
-                        {isTyping && (
+                        {/* Typing Indicator — shown while awaiting AI response */}
+                        {isAwaitingNetwork && (
                             <div className="flex justify-start">
                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold mr-2">
                                     AI
@@ -312,26 +214,25 @@ export default function ChatWidget({
 
                     {/* Input Area */}
                     <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center space-x-2">
+                        <form onSubmit={onSubmit} className="flex items-center space-x-2">
                             <input
                                 ref={inputRef}
                                 type="text"
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
-                                onKeyPress={handleKeyPress}
                                 placeholder="Type your message..."
-                                disabled={dealAccepted}
+                                disabled={dealAccepted || isAwaitingNetwork}
                                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                             <button
-                                onClick={sendMessage}
-                                disabled={!inputText.trim() || dealAccepted}
+                                type="submit"
+                                disabled={!inputText.trim() || dealAccepted || isAwaitingNetwork}
                                 className="p-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
                                 aria-label="Send message"
                             >
                                 <Send className="w-5 h-5" />
                             </button>
-                        </div>
+                        </form>
                     </div>
                 </div>
             )}
