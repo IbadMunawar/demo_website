@@ -22,16 +22,16 @@ export default async function handler(
     }
 
     // Server-to-server call – credentials stay on the server
-    const inaResponse = await fetch(process.env.INA_PLATFORM_INIT_URL as string, {
+    const inaResponse = await fetch(process.env.INA_PLATFORM_INIT_URL!, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': process.env.TENANT_API_KEY as string,
         },
         body: JSON.stringify({
-            context_id: productId,
-            asking_price: product.displayed_price,
-            mam: product.mam,
+            api_key: process.env.TENANT_API_KEY!,          // <-- Added to body
+            context_id: String(productId),                  // Ensuring it's a string
+            mam: Number(product.mam),                       // Ensuring it's a number
+            asking_price: Number(product.displayed_price),  // Ensuring it's a number
         }),
     });
 
