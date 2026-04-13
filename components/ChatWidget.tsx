@@ -41,6 +41,9 @@ export default function ChatWidget({
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    // Ref-based guard so the greeting fires exactly once even in React StrictMode,
+    // which double-invokes effects. useState update is async; useRef is synchronous.
+    const hasStartedNegotiationRef = useRef(false);
 
     // Auto-scroll to bottom
     const scrollToBottom = () => {
@@ -50,6 +53,21 @@ export default function ChatWidget({
     useEffect(() => {
         scrollToBottom();
     }, [chatHistory, isAwaitingNetwork]);
+
+    // Auto-open the chat window as soon as the session is ready.
+    // Runs whenever sessionId changes. If a valid session arrives and negotiation
+    // hasn't started yet, mount the window, fire the greeting, and focus the input.
+    useEffect(() => {
+        if (sessionId && !hasStartedNegotiationRef.current) {
+            hasStartedNegotiationRef.current = true;
+            setIsOpen(true);
+            startNegotiation();
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 300);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionId]);
 
     // Initialize negotiation session
     // Session is always pre-provided by the parent via /api/start-session.
@@ -81,12 +99,16 @@ export default function ChatWidget({
 
         setIsAwaitingNetwork(true);
         try {
+            console.log(sessionId)
             const res = await fetch(
                 process.env.NEXT_PUBLIC_INA_ORCHESTRATOR_CHAT_URL as string,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: sessionId, user_text: userText }),
+                    body: JSON.stringify({
+                        user_id: sessionId,
+                        message: userText
+                    }),
                 }
             );
 
@@ -97,7 +119,7 @@ export default function ChatWidget({
             // Append AI reply to shared history
             setChatHistory((prev) => [
                 ...prev,
-                { role: 'ai', text: response.response_text },
+                { role: 'ai', text: response.response },
             ]);
 
             // --- Success Protocol ---

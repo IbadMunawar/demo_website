@@ -34,15 +34,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Step B & C: Make authenticated server-to-server call to INA Platform
-        const inaBackendUrl = process.env.INA_BACKEND_URL;
+        const inaSessionInitUrl = process.env.INA_PLATFORM_INIT_URL;
         const tenantApiKey = process.env.TENANT_API_KEY;
 
-        if (!inaBackendUrl || !tenantApiKey) {
+        if (!inaSessionInitUrl || !tenantApiKey) {
             console.error('Missing INA configuration. Please update .env.local file.');
             return NextResponse.json(
                 {
                     error: 'Server configuration incomplete',
-                    message: 'Please configure INA_BACKEND_URL and TENANT_API_KEY in .env.local'
+                    message: 'Please configure INA_PLATFORM_INIT_URL and TENANT_API_KEY in .env.local'
                 },
                 { status: 500 }
             );
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         };
 
         // Make the server-to-server call
-        const response = await fetch(`${inaBackendUrl}/session/init`, {
+        const response = await fetch(inaSessionInitUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
