@@ -13,7 +13,7 @@ import { useCartStore } from '@/store/cartStore';
 export default function ProductDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const productId = params.id as string;
+    const productId = (params?.id ?? '') as string;
     const product = getProductById(productId);
 
     const [negotiatedPrice, setNegotiatedPrice] = useState<number | null>(null);
