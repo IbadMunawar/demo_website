@@ -175,7 +175,7 @@ export default function ChatWidget({
 
             {/* Chat Window */}
             {isOpen && (
-                <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="fixed bottom-0 right-0 w-full h-[85vh] rounded-t-2xl rounded-b-none md:bottom-6 md:right-6 md:w-96 md:h-[600px] md:rounded-2xl bg-white dark:bg-gray-800 shadow-2xl flex flex-col z-50 border border-gray-200 dark:border-gray-700 overflow-hidden">
                     {/* Header */}
                     <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex items-center justify-between">
                         <div className="flex items-center space-x-3">
