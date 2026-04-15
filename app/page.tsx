@@ -36,7 +36,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto">
             {/* Hero Section */}
             <div className="text-center mb-16 pt-12">
-              <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                 Premium Tech Store
               </h1>
               <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">

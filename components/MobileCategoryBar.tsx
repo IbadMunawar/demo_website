@@ -16,7 +16,7 @@ export default function MobileCategoryBar({
     return (
         <div className="md:hidden mb-8 -mx-4 px-4">
             <div className="overflow-x-auto pb-2 scrollbar-hide">
-                <div className="flex gap-3 min-w-max">
+                <div className="inline-flex gap-3">
                     {/* All Products Pill */}
                     <button
                         onClick={() => onSelectCategory('All')}
